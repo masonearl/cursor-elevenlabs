@@ -16,41 +16,44 @@
   "contributes": {
     "commands": [
       {
-        "command": "cursorVoice.startConversation",
-        "title": "Start Voice Conversation",
+        "command": "cursorVoice.openVoiceInput",
+        "title": "Cursor Voice: Open Voice Input",
         "icon": "$(mic)"
       },
       {
-        "command": "cursorVoice.stopConversation",
-        "title": "Stop Voice Conversation",
-        "icon": "$(mic-filled)"
+        "command": "cursorVoice.testTTS",
+        "title": "Cursor Voice: Test Text-to-Speech",
+        "icon": "$(play)"
       },
       {
-        "command": "cursorVoice.testTTS",
-        "title": "Test Text-to-Speech",
-        "icon": "$(play)"
+        "command": "cursorVoice.speakSelection",
+        "title": "Cursor Voice: Speak Selected Text",
+        "icon": "$(unmute)"
+      },
+      {
+        "command": "cursorVoice.speakClipboard",
+        "title": "Cursor Voice: Speak Clipboard",
+        "icon": "$(clippy)"
+      },
+      {
+        "command": "cursorVoice.stop",
+        "title": "Cursor Voice: Stop Speaking",
+        "icon": "$(mute)"
+      },
+      {
+        "command": "cursorVoice.typeAndSpeak",
+        "title": "Cursor Voice: Type and Speak",
+        "icon": "$(comment)"
       }
     ],
     "menus": {
       "commandPalette": [
-        {
-          "command": "cursorVoice.startConversation"
-        },
-        {
-          "command": "cursorVoice.stopConversation"
-        }
-      ],
-      "editor/title": [
-        {
-          "command": "cursorVoice.startConversation",
-          "when": "!cursorVoice.isActive",
-          "group": "navigation"
-        },
-        {
-          "command": "cursorVoice.stopConversation",
-          "when": "cursorVoice.isActive",
-          "group": "navigation"
-        }
+        { "command": "cursorVoice.openVoiceInput" },
+        { "command": "cursorVoice.testTTS" },
+        { "command": "cursorVoice.speakSelection" },
+        { "command": "cursorVoice.speakClipboard" },
+        { "command": "cursorVoice.stop" },
+        { "command": "cursorVoice.typeAndSpeak" }
       ]
     },
     "configuration": {

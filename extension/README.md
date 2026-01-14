@@ -23,16 +23,22 @@ npm run compile
 
 3. Press F5 to launch extension development host
 
-4. Configure settings:
-- Set `cursorVoice.elevenlabsApiKey` in VS Code settings
-- Optionally set `cursorVoice.voiceId` for custom voice
+4. Configure settings (optional):
+- `cursorVoice.macosVoice` - macOS voice name (e.g., "Alex", "Samantha", "Victoria")
+- `cursorVoice.useElevenLabs` - Set to `true` to use ElevenLabs (requires API key)
+- `cursorVoice.elevenlabsApiKey` - Only needed if `useElevenLabs` is true
 
 ## Usage
 
+**Test TTS first:**
+- Press `Cmd+Shift+P` → "Test Text-to-Speech"
+- You should hear macOS voice speak a test message
+
+**Start voice conversation:**
 - Press `Cmd+Shift+P` → "Start Voice Conversation"
 - Or click the microphone icon in the status bar
-- Speak your coding request
-- Listen to Cursor's response
+- Speak your coding request (currently records but doesn't transcribe yet)
+- Listen to Cursor's response via macOS TTS
 - Continue the conversation
 
 ## Development

@@ -36,138 +36,105 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.activate = activate;
 exports.deactivate = deactivate;
 const vscode = __importStar(require("vscode"));
-const voiceRecorder_1 = require("./voiceRecorder");
 const voicePlayer_1 = require("./voicePlayer");
-const cursorChat_1 = require("./cursorChat");
-let voiceRecorder = null;
+const speechServer_1 = require("./speechServer");
 let voicePlayer = null;
-let chatIntegration = null;
-let isActive = false;
 let statusBarItem;
+const SPEECH_SERVER_PORT = 3847;
 function activate(context) {
     console.log('Cursor Voice Assistant is now active!');
     // Create status bar item
     statusBarItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right, 100);
-    statusBarItem.command = 'cursorVoice.startConversation';
+    statusBarItem.command = 'cursorVoice.openVoiceInput';
     statusBarItem.text = '$(mic) Voice';
-    statusBarItem.tooltip = 'Start Voice Conversation';
+    statusBarItem.tooltip = 'Open Voice Input';
     statusBarItem.show();
-    // Initialize components (using macOS built-in TTS by default)
-    voiceRecorder = new voiceRecorder_1.VoiceRecorder();
-    voicePlayer = new voicePlayer_1.VoicePlayer(false); // false = use macOS 'say' command
-    chatIntegration = new cursorChat_1.CursorChatIntegration();
-    // Register commands
-    const startCommand = vscode.commands.registerCommand('cursorVoice.startConversation', async () => {
-        await startVoiceConversation(context);
+    // Initialize TTS player (using macOS built-in TTS)
+    voicePlayer = new voicePlayer_1.VoicePlayer(false);
+    // Start the speech server
+    (0, speechServer_1.startSpeechServer)(SPEECH_SERVER_PORT).then(() => {
+        console.log(`Speech server started on port ${SPEECH_SERVER_PORT}`);
+    }).catch(err => {
+        console.error('Failed to start speech server:', err);
     });
-    // Add test command for TTS
+    // Handle transcription from the web UI
+    (0, speechServer_1.setTranscriptionCallback)(async (text) => {
+        // Copy to clipboard
+        await vscode.env.clipboard.writeText(text);
+        // Try to open Cursor's chat and paste
+        try {
+            // Open Cursor chat (Cmd+L)
+            await vscode.commands.executeCommand('workbench.action.chat.open');
+            // Small delay then paste
+            setTimeout(async () => {
+                await vscode.commands.executeCommand('editor.action.clipboardPasteAction');
+                vscode.window.showInformationMessage('Text pasted to chat. Press Enter to send.');
+            }, 500);
+        }
+        catch (error) {
+            vscode.window.showInformationMessage('Text copied to clipboard. Paste it into Cursor chat.');
+        }
+    });
+    // Command: Open voice input web page
+    const openVoiceInputCommand = vscode.commands.registerCommand('cursorVoice.openVoiceInput', async () => {
+        const url = `http://localhost:${SPEECH_SERVER_PORT}`;
+        vscode.env.openExternal(vscode.Uri.parse(url));
+        vscode.window.showInformationMessage('Voice input opened in browser. Speak and click "Send to Cursor".');
+    });
+    // Command: Test TTS
     const testTTSCommand = vscode.commands.registerCommand('cursorVoice.testTTS', async () => {
         if (voicePlayer) {
             await voicePlayer.play('Hello! This is a test of the voice assistant. The macOS built-in text to speech is working.');
         }
     });
-    const stopCommand = vscode.commands.registerCommand('cursorVoice.stopConversation', async () => {
-        await stopVoiceConversation();
+    // Command: Speak selected text
+    const speakSelectionCommand = vscode.commands.registerCommand('cursorVoice.speakSelection', async () => {
+        const editor = vscode.window.activeTextEditor;
+        if (editor && voicePlayer) {
+            const selection = editor.document.getText(editor.selection);
+            if (selection) {
+                await voicePlayer.play(selection);
+            }
+            else {
+                vscode.window.showWarningMessage('No text selected. Select text first, then run this command.');
+            }
+        }
     });
-    context.subscriptions.push(startCommand, stopCommand, testTTSCommand, statusBarItem);
-    // Auto-start if configured
-    const config = vscode.workspace.getConfiguration('cursorVoice');
-    if (config.get('autoStart', false)) {
-        vscode.commands.executeCommand('cursorVoice.startConversation');
-    }
-}
-async function startVoiceConversation(context) {
-    if (isActive) {
-        vscode.window.showInformationMessage('Voice conversation is already active');
-        return;
-    }
-    try {
-        isActive = true;
-        statusBarItem.text = '$(mic-filled) Voice Active';
-        statusBarItem.command = 'cursorVoice.stopConversation';
-        statusBarItem.tooltip = 'Stop Voice Conversation';
-        statusBarItem.backgroundColor = new vscode.ThemeColor('statusBarItem.warningBackground');
-        vscode.window.showInformationMessage('🎤 Voice conversation started! Speak to build code.');
-        // Start the conversation loop
-        await conversationLoop();
-    }
-    catch (error) {
-        vscode.window.showErrorMessage(`Failed to start voice conversation: ${error.message}`);
-        await stopVoiceConversation();
-    }
-}
-async function stopVoiceConversation() {
-    if (!isActive) {
-        return;
-    }
-    isActive = false;
-    statusBarItem.text = '$(mic) Voice';
-    statusBarItem.command = 'cursorVoice.startConversation';
-    statusBarItem.tooltip = 'Start Voice Conversation';
-    statusBarItem.backgroundColor = undefined;
-    if (voiceRecorder) {
-        await voiceRecorder.stop();
-    }
-    if (voicePlayer) {
-        await voicePlayer.stop();
-    }
-    vscode.window.showInformationMessage('Voice conversation stopped');
-}
-async function conversationLoop() {
-    if (!voiceRecorder || !voicePlayer || !chatIntegration) {
-        return;
-    }
-    while (isActive) {
-        try {
-            // Step 1: Record audio
-            vscode.window.showInformationMessage('🎤 Listening...');
-            const audioData = await voiceRecorder.record();
-            if (!audioData) {
-                continue;
+    // Command: Speak clipboard content
+    const speakClipboardCommand = vscode.commands.registerCommand('cursorVoice.speakClipboard', async () => {
+        if (voicePlayer) {
+            const clipboardText = await vscode.env.clipboard.readText();
+            if (clipboardText) {
+                await voicePlayer.play(clipboardText);
             }
-            // Step 2: Transcribe audio (placeholder - needs implementation)
-            vscode.window.showInformationMessage('📝 Transcribing...');
-            const transcription = await transcribeAudio(audioData);
-            if (!transcription || transcription.trim().length === 0) {
-                continue;
-            }
-            vscode.window.showInformationMessage(`You said: "${transcription}"`);
-            // Step 3: Send to Cursor chat
-            vscode.window.showInformationMessage('💬 Sending to Cursor...');
-            await chatIntegration.sendToChat(transcription);
-            // Step 4: Wait for response (this is tricky - we'll need to monitor chat)
-            // For now, we'll use a simple approach: wait and then get the last response
-            await new Promise(resolve => setTimeout(resolve, 2000));
-            // Step 5: Get Cursor's response (placeholder - needs implementation)
-            const cursorResponse = await chatIntegration.getLastResponse();
-            if (cursorResponse) {
-                // Step 6: Convert to speech and play
-                vscode.window.showInformationMessage('🔊 Speaking response...');
-                await voicePlayer.play(cursorResponse);
+            else {
+                vscode.window.showWarningMessage('Clipboard is empty');
             }
         }
-        catch (error) {
-            vscode.window.showErrorMessage(`Error in conversation loop: ${error.message}`);
-            // Continue the loop
+    });
+    // Command: Stop speaking
+    const stopCommand = vscode.commands.registerCommand('cursorVoice.stop', async () => {
+        if (voicePlayer) {
+            await voicePlayer.stop();
+            vscode.window.showInformationMessage('Voice stopped');
         }
-    }
-}
-async function transcribeAudio(audioData) {
-    try {
-        // TODO: Implement transcription
-        // Options:
-        // 1. Use macOS built-in speech recognition (Speech framework)
-        // 2. Use Whisper locally
-        // 3. Use ElevenLabs STT API
-        // For now, return null as placeholder
-        vscode.window.showInformationMessage('⚠️ Transcription not yet implemented. Audio captured but not transcribed.');
-        return null;
-    }
-    catch (error) {
-        throw new Error(`Transcription failed: ${error.message}`);
-    }
+    });
+    // Command: Type and speak
+    const typeAndSpeakCommand = vscode.commands.registerCommand('cursorVoice.typeAndSpeak', async () => {
+        const input = await vscode.window.showInputBox({
+            prompt: 'What would you like me to say?',
+            placeHolder: 'Type your message...'
+        });
+        if (input && voicePlayer) {
+            await voicePlayer.play(input);
+        }
+    });
+    context.subscriptions.push(openVoiceInputCommand, testTTSCommand, speakSelectionCommand, speakClipboardCommand, stopCommand, typeAndSpeakCommand, statusBarItem);
 }
 function deactivate() {
-    stopVoiceConversation();
+    (0, speechServer_1.stopSpeechServer)();
+    if (voicePlayer) {
+        voicePlayer.stop();
+    }
 }
 //# sourceMappingURL=extension.js.map
