@@ -1,0 +1,86 @@
+{
+  "name": "cursor-elevenlabs-voice",
+  "displayName": "Cursor ElevenLabs Voice Assistant",
+  "description": "Bidirectional voice conversation for building code in Cursor using ElevenLabs",
+  "version": "0.1.0",
+  "engines": {
+    "vscode": "^1.80.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "activationEvents": [
+    "onStartupFinished"
+  ],
+  "main": "./out/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "cursorVoice.startConversation",
+        "title": "Start Voice Conversation",
+        "icon": "$(mic)"
+      },
+      {
+        "command": "cursorVoice.stopConversation",
+        "title": "Stop Voice Conversation",
+        "icon": "$(mic-filled)"
+      }
+    ],
+    "menus": {
+      "commandPalette": [
+        {
+          "command": "cursorVoice.startConversation"
+        },
+        {
+          "command": "cursorVoice.stopConversation"
+        }
+      ],
+      "editor/title": [
+        {
+          "command": "cursorVoice.startConversation",
+          "when": "!cursorVoice.isActive",
+          "group": "navigation"
+        },
+        {
+          "command": "cursorVoice.stopConversation",
+          "when": "cursorVoice.isActive",
+          "group": "navigation"
+        }
+      ]
+    },
+    "configuration": {
+      "title": "Cursor ElevenLabs Voice",
+      "properties": {
+        "cursorVoice.elevenlabsApiKey": {
+          "type": "string",
+          "default": "",
+          "description": "Your ElevenLabs API key",
+          "secret": true
+        },
+        "cursorVoice.voiceId": {
+          "type": "string",
+          "default": "",
+          "description": "ElevenLabs voice ID (leave empty for default)"
+        },
+        "cursorVoice.autoStart": {
+          "type": "boolean",
+          "default": false,
+          "description": "Automatically start voice conversation on startup"
+        }
+      }
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./"
+  },
+  "devDependencies": {
+    "@types/vscode": "^1.80.0",
+    "@types/node": "^20.0.0",
+    "typescript": "^5.0.0"
+  },
+  "dependencies": {
+    "@elevenlabs/elevenlabs-js": "^2.31.0"
+  }
+}
