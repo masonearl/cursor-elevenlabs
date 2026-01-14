@@ -24,6 +24,11 @@
         "command": "cursorVoice.stopConversation",
         "title": "Stop Voice Conversation",
         "icon": "$(mic-filled)"
+      },
+      {
+        "command": "cursorVoice.testTTS",
+        "title": "Test Text-to-Speech",
+        "icon": "$(play)"
       }
     ],
     "menus": {
@@ -57,10 +62,20 @@
           "description": "Your ElevenLabs API key",
           "secret": true
         },
+        "cursorVoice.macosVoice": {
+          "type": "string",
+          "default": "",
+          "description": "macOS voice name (e.g., 'Alex', 'Samantha', 'Victoria'). Leave empty for system default."
+        },
+        "cursorVoice.useElevenLabs": {
+          "type": "boolean",
+          "default": false,
+          "description": "Use ElevenLabs TTS instead of macOS built-in (requires API key)"
+        },
         "cursorVoice.voiceId": {
           "type": "string",
           "default": "",
-          "description": "ElevenLabs voice ID (leave empty for default)"
+          "description": "ElevenLabs voice ID (only used if useElevenLabs is true)"
         },
         "cursorVoice.autoStart": {
           "type": "boolean",
@@ -80,7 +95,5 @@
     "@types/node": "^20.0.0",
     "typescript": "^5.0.0"
   },
-  "dependencies": {
-    "@elevenlabs/elevenlabs-js": "^2.31.0"
-  }
+  "dependencies": {}
 }

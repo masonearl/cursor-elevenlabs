@@ -35,109 +35,84 @@ var __importStar = (this && this.__importStar) || (function () {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.VoicePlayer = void 0;
 const vscode = __importStar(require("vscode"));
-const fs = __importStar(require("fs"));
-const path = __importStar(require("path"));
-const os = __importStar(require("os"));
+const child_process_1 = require("child_process");
+const util_1 = require("util");
+const execAsync = (0, util_1.promisify)(child_process_1.exec);
 class VoicePlayer {
-    constructor(client) {
-        this.client = client;
-        this.webviewPanel = null;
+    constructor(useElevenLabs = false, elevenLabsClient) {
+        this.useElevenLabs = useElevenLabs;
+        this.elevenLabsClient = elevenLabsClient;
+        this.currentProcess = null;
     }
     async play(text, voiceId) {
         try {
-            // Get voice ID from config or use default
             const config = vscode.workspace.getConfiguration('cursorVoice');
-            const finalVoiceId = voiceId || config.get('voiceId', '21m00Tcm4TlvDq8ikWAM');
-            // Generate speech
-            const audioStream = await this.client.textToSpeech.convert(finalVoiceId, {
-                text: text,
-                modelId: 'eleven_monolingual_v1',
-            });
-            // Convert stream to audio buffer
-            const chunks = [];
-            for await (const chunk of audioStream) {
-                chunks.push(chunk);
+            const useElevenLabs = config.get('useElevenLabs', false);
+            if (useElevenLabs && this.elevenLabsClient) {
+                // Use ElevenLabs if configured
+                await this.playWithElevenLabs(text, voiceId);
             }
-            const audioData = new Uint8Array(chunks.reduce((acc, chunk) => acc + chunk.length, 0));
-            let offset = 0;
-            for (const chunk of chunks) {
-                audioData.set(chunk, offset);
-                offset += chunk.length;
+            else {
+                // Use macOS built-in 'say' command (default)
+                await this.playWithSay(text);
             }
-            // Play audio using webview
-            await this.playAudioInWebview(audioData);
         }
         catch (error) {
             throw new Error(`Failed to play audio: ${error.message}`);
         }
     }
-    async playAudioInWebview(audioData) {
+    async playWithSay(text) {
         return new Promise((resolve, reject) => {
-            // Create temporary file for audio
-            const tempDir = os.tmpdir();
-            const tempFile = path.join(tempDir, `cursor-voice-${Date.now()}.mp3`);
-            fs.writeFileSync(tempFile, audioData);
-            // Create webview for audio playback
-            this.webviewPanel = vscode.window.createWebviewPanel('voicePlayer', 'Voice Player', vscode.ViewColumn.Beside, {
-                enableScripts: true,
-                retainContextWhenHidden: false,
-            });
-            // Convert file to data URI for webview
-            const base64Audio = Buffer.from(audioData).toString('base64');
-            const audioDataUri = `data:audio/mpeg;base64,${base64Audio}`;
-            this.webviewPanel.webview.html = `<!DOCTYPE html>
-<html>
-<head>
-    <meta charset="UTF-8">
-</head>
-<body>
-    <h2>🔊 Playing audio...</h2>
-    <audio id="audioPlayer" autoplay>
-        <source src="${audioDataUri}" type="audio/mpeg">
-    </audio>
-    <script>
-        const vscode = acquireVsCodeApi();
-        const audio = document.getElementById('audioPlayer');
-        audio.onended = () => {
-            vscode.postMessage({ command: 'playbackEnded' });
-        };
-        audio.onerror = () => {
-            vscode.postMessage({ command: 'playbackError' });
-        };
-    </script>
-</body>
-</html>`;
-            this.webviewPanel.webview.onDidReceiveMessage((message) => {
-                if (message.command === 'playbackEnded') {
-                    // Clean up
-                    fs.unlinkSync(tempFile);
-                    if (this.webviewPanel) {
-                        this.webviewPanel.dispose();
-                    }
+            // Get voice from config or use default
+            const config = vscode.workspace.getConfiguration('cursorVoice');
+            const voice = config.get('macosVoice', ''); // e.g., "Alex", "Samantha", "Victoria"
+            // Escape text for shell
+            const escapedText = text.replace(/'/g, "'\\''");
+            const voiceArg = voice ? `-v ${voice}` : '';
+            // Use macOS 'say' command
+            const command = `say ${voiceArg} '${escapedText}'`;
+            vscode.window.showInformationMessage(`🔊 Speaking: "${text.substring(0, 50)}${text.length > 50 ? '...' : ''}"`);
+            this.currentProcess = (0, child_process_1.exec)(command, (error) => {
+                this.currentProcess = null;
+                if (error) {
+                    reject(new Error(`Say command failed: ${error.message}`));
+                }
+                else {
                     resolve();
-                }
-                else if (message.command === 'playbackError') {
-                    fs.unlinkSync(tempFile);
-                    if (this.webviewPanel) {
-                        this.webviewPanel.dispose();
-                    }
-                    reject(new Error('Audio playback failed'));
-                }
-            });
-            this.webviewPanel.onDidDispose(() => {
-                // Clean up temp file
-                try {
-                    fs.unlinkSync(tempFile);
-                }
-                catch (e) {
-                    // File might already be deleted
                 }
             });
         });
     }
+    async playWithElevenLabs(text, voiceId) {
+        // Keep ElevenLabs implementation for future use
+        // This would use the webview approach from before
+        throw new Error('ElevenLabs TTS not implemented in this version');
+    }
     async stop() {
-        if (this.webviewPanel) {
-            this.webviewPanel.dispose();
+        if (this.currentProcess) {
+            this.currentProcess.kill();
+            this.currentProcess = null;
+        }
+    }
+    /**
+     * List available macOS voices
+     */
+    static async listVoices() {
+        try {
+            const { stdout } = await execAsync('say -v ?');
+            const voices = stdout
+                .split('\n')
+                .filter(line => line.trim().length > 0)
+                .map(line => {
+                // Parse "Alex en_US    # Hello, my name is Alex."
+                const match = line.match(/^(\w+)\s+/);
+                return match ? match[1] : null;
+            })
+                .filter((v) => v !== null);
+            return voices;
+        }
+        catch (error) {
+            return ['Alex', 'Samantha', 'Victoria']; // Fallback to common voices
         }
     }
 }

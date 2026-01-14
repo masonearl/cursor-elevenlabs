@@ -36,7 +36,6 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.activate = activate;
 exports.deactivate = deactivate;
 const vscode = __importStar(require("vscode"));
-const elevenlabs_js_1 = require("@elevenlabs/elevenlabs-js");
 const voiceRecorder_1 = require("./voiceRecorder");
 const voicePlayer_1 = require("./voicePlayer");
 const cursorChat_1 = require("./cursorChat");
@@ -46,42 +45,38 @@ let chatIntegration = null;
 let isActive = false;
 let statusBarItem;
 function activate(context) {
-    console.log('Cursor ElevenLabs Voice Assistant is now active!');
+    console.log('Cursor Voice Assistant is now active!');
     // Create status bar item
     statusBarItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right, 100);
     statusBarItem.command = 'cursorVoice.startConversation';
     statusBarItem.text = '$(mic) Voice';
     statusBarItem.tooltip = 'Start Voice Conversation';
     statusBarItem.show();
-    // Get configuration
-    const config = vscode.workspace.getConfiguration('cursorVoice');
-    const apiKey = config.get('elevenlabsApiKey', '');
-    if (!apiKey) {
-        vscode.window.showWarningMessage('ElevenLabs API key not configured. Please set cursorVoice.elevenlabsApiKey in settings.');
-        return;
-    }
-    // Initialize ElevenLabs client
-    const elevenlabsClient = new elevenlabs_js_1.ElevenLabsClient({
-        apiKey: apiKey,
-    });
-    // Initialize components
+    // Initialize components (using macOS built-in TTS by default)
     voiceRecorder = new voiceRecorder_1.VoiceRecorder();
-    voicePlayer = new voicePlayer_1.VoicePlayer(elevenlabsClient);
+    voicePlayer = new voicePlayer_1.VoicePlayer(false); // false = use macOS 'say' command
     chatIntegration = new cursorChat_1.CursorChatIntegration();
     // Register commands
     const startCommand = vscode.commands.registerCommand('cursorVoice.startConversation', async () => {
-        await startVoiceConversation(context, elevenlabsClient);
+        await startVoiceConversation(context);
+    });
+    // Add test command for TTS
+    const testTTSCommand = vscode.commands.registerCommand('cursorVoice.testTTS', async () => {
+        if (voicePlayer) {
+            await voicePlayer.play('Hello! This is a test of the voice assistant. The macOS built-in text to speech is working.');
+        }
     });
     const stopCommand = vscode.commands.registerCommand('cursorVoice.stopConversation', async () => {
         await stopVoiceConversation();
     });
-    context.subscriptions.push(startCommand, stopCommand, statusBarItem);
+    context.subscriptions.push(startCommand, stopCommand, testTTSCommand, statusBarItem);
     // Auto-start if configured
+    const config = vscode.workspace.getConfiguration('cursorVoice');
     if (config.get('autoStart', false)) {
         vscode.commands.executeCommand('cursorVoice.startConversation');
     }
 }
-async function startVoiceConversation(context, client) {
+async function startVoiceConversation(context) {
     if (isActive) {
         vscode.window.showInformationMessage('Voice conversation is already active');
         return;
@@ -94,7 +89,7 @@ async function startVoiceConversation(context, client) {
         statusBarItem.backgroundColor = new vscode.ThemeColor('statusBarItem.warningBackground');
         vscode.window.showInformationMessage('🎤 Voice conversation started! Speak to build code.');
         // Start the conversation loop
-        await conversationLoop(client);
+        await conversationLoop();
     }
     catch (error) {
         vscode.window.showErrorMessage(`Failed to start voice conversation: ${error.message}`);
@@ -118,7 +113,7 @@ async function stopVoiceConversation() {
     }
     vscode.window.showInformationMessage('Voice conversation stopped');
 }
-async function conversationLoop(client) {
+async function conversationLoop() {
     if (!voiceRecorder || !voicePlayer || !chatIntegration) {
         return;
     }
@@ -130,9 +125,9 @@ async function conversationLoop(client) {
             if (!audioData) {
                 continue;
             }
-            // Step 2: Transcribe using ElevenLabs STT
+            // Step 2: Transcribe audio (placeholder - needs implementation)
             vscode.window.showInformationMessage('📝 Transcribing...');
-            const transcription = await transcribeAudio(client, audioData);
+            const transcription = await transcribeAudio(audioData);
             if (!transcription || transcription.trim().length === 0) {
                 continue;
             }
@@ -157,11 +152,15 @@ async function conversationLoop(client) {
         }
     }
 }
-async function transcribeAudio(client, audioData) {
+async function transcribeAudio(audioData) {
     try {
-        // TODO: Implement ElevenLabs transcription API
-        // For now, we'll need to check if they have STT endpoints
-        // This is a placeholder
+        // TODO: Implement transcription
+        // Options:
+        // 1. Use macOS built-in speech recognition (Speech framework)
+        // 2. Use Whisper locally
+        // 3. Use ElevenLabs STT API
+        // For now, return null as placeholder
+        vscode.window.showInformationMessage('⚠️ Transcription not yet implemented. Audio captured but not transcribed.');
         return null;
     }
     catch (error) {
